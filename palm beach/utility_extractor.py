@@ -25,7 +25,7 @@ def extract_utility_from_html(html, file_id):
         'solar_panel_present': False,
         'solar_panel_type': None,
         'solar_panel_type_other_description': None,
-        'smart_home_features': [],
+        'smart_home_features': None,
         'smart_home_features_other_description': None,
         'hvac_unit_condition': None,
         'solar_inverter_visible': False,
