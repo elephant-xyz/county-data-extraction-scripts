@@ -68,8 +68,23 @@ def extract_structure_from_html(html, file_id):
     }
     # Building type/attachment and architectural_style_type
     # Only extract if explicitly present in input (not inferred from use code)
+    # Try to extract attachment_type from 'Property Use Code' or similar
+    use_code = soup.find(string=re.compile(r'Property Use Code'))
+    if use_code:
+        val = use_code.find_parent('tr').find_all('td')[-1].get_text(strip=True)
+        if 'CONDOMINIUM' in val.upper():
+            structure['attachment_type'] = 'Attached'
+        elif 'TOWNHOUSE' in val.upper():
+            structure['attachment_type'] = 'Attached'
+        elif 'DUPLEX' in val.upper():
+            structure['attachment_type'] = 'SemiDetached'
+        elif 'SINGLE FAMILY' in val.upper():
+            structure['attachment_type'] = 'Detached'
+        else:
+            structure['attachment_type'] = None
+    else:
+        structure['attachment_type'] = None
     structure['architectural_style_type'] = None
-    structure['attachment_type'] = None
     # Exterior wall
     ext_wall = soup.find(string=re.compile(r'Exterior Wall 1'))
     if ext_wall:
@@ -89,6 +104,8 @@ def extract_structure_from_html(html, file_id):
         val = ext_wall2.find_parent('tr').find_all('td')[-1].get_text(strip=True)
         if 'STUCCO' in val.upper():
             structure['exterior_wall_material_secondary'] = 'Stucco Accent'
+        elif 'NONE' in val.upper():
+            structure['exterior_wall_material_secondary'] = None  # Schema only allows enum, so None
         else:
             structure['exterior_wall_material_secondary'] = None
     # Roof
@@ -110,14 +127,7 @@ def extract_structure_from_html(html, file_id):
             structure['roof_covering_material'] = 'Metal Corrugated'
         else:
             structure['roof_covering_material'] = None
-    # Stories
-    stories = soup.find(string=re.compile(r'Stories'))
-    if stories:
-        val = stories.find_parent('tr').find_all('td')[-1].get_text(strip=True)
-        try:
-            structure['number_of_stories'] = int(val)
-        except:
-            structure['number_of_stories'] = None
+
     # Flooring
     floor1 = soup.find(string=re.compile(r'Floor Type 1'))
     if floor1:
@@ -137,6 +147,24 @@ def extract_structure_from_html(html, file_id):
             structure['flooring_material_secondary'] = 'Carpet'
         else:
             structure['flooring_material_secondary'] = None
+    # Interior wall surface material (primary)
+    int_wall1 = soup.find(string=re.compile(r'Interior Wall 1'))
+    if int_wall1:
+        val = int_wall1.find_parent('tr').find_all('td')[-1].get_text(strip=True)
+        if 'DRYWALL' in val.upper():
+            structure['interior_wall_surface_material_primary'] = 'Drywall'
+        elif 'PLASTER' in val.upper():
+            structure['interior_wall_surface_material_primary'] = 'Plaster'
+        else:
+            structure['interior_wall_surface_material_primary'] = None
+    # Year Built
+    year_built = soup.find(string=re.compile(r'Year Built'))
+    if year_built:
+        val = year_built.find_parent('tr').find_all('td')[-1].get_text(strip=True)
+        try:
+            structure['year_built'] = int(val)
+        except:
+            structure['year_built'] = None
     # All other fields remain None unless explicitly present in input
     return structure
 
