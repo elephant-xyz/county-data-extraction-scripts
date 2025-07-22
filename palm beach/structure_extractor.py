@@ -22,8 +22,8 @@ def extract_structure_from_html(html, file_id):
             'method': 'GET',
             'url': f'https://www.pbcgov.org/papa/Property/Details?parcelID={file_id}'
         },
-        'architectural_style_type': None,
-        'attachment_type': None,
+        'architectural_style_type': None,  # Only if explicitly present in input
+        'attachment_type': None,  # Only if explicitly present in input
         'number_of_stories': None,
         'exterior_wall_material_primary': None,
         'exterior_wall_material_secondary': None,
@@ -68,67 +68,17 @@ def extract_structure_from_html(html, file_id):
         'structural_damage_indicators': None
     }
     # Building type/attachment and architectural_style_type
-    use_code = soup.find(string=re.compile(r'Property Use Code'))
-    if use_code:
-        val = use_code.find_parent('tr').find_all('td')[-1].get_text(strip=True)
-        val_upper = val.upper()
-        # Attachment type
-        if 'TOWNHOUSE' in val_upper or 'CONDO' in val_upper or 'CONDOMINIUM' in val_upper:
-            structure['attachment_type'] = 'Attached'
-        else:
-            structure['attachment_type'] = None
-        # Architectural style type
-        if 'TOWNHOUSE' in val_upper:
-            structure['architectural_style_type'] = 'Contemporary'  # Closest enum for modern townhouses
-        elif 'CONDO' in val_upper or 'CONDOMINIUM' in val_upper:
-            structure['architectural_style_type'] = 'Minimalist'  # Closest enum for condos
-        else:
-            structure['architectural_style_type'] = None
-    else:
-        use_code_desc = soup.find(string=re.compile(r'UseCodeDesc|Use Code Desc|Use Code'))
-        if use_code_desc:
-            val = use_code_desc.find_parent('tr').find_all('td')[-1].get_text(strip=True)
-            val_upper = val.upper()
-            if 'TOWNHOUSE' in val_upper or 'CONDO' in val_upper or 'CONDOMINIUM' in val_upper:
-                structure['attachment_type'] = 'Attached'
-            else:
-                structure['attachment_type'] = None
-            if 'TOWNHOUSE' in val_upper:
-                structure['architectural_style_type'] = 'Contemporary'
-            elif 'CONDO' in val_upper or 'CONDOMINIUM' in val_upper:
-                structure['architectural_style_type'] = 'Minimalist'
-            else:
-                structure['architectural_style_type'] = None
-    # Ensure all string fields are either string or None
-    # For enum fields, set to None if missing; for required string fields, set to '' if missing and schema does not allow null
-    enum_fields = [
-        'architectural_style_type', 'attachment_type', 'ceiling_condition', 'ceiling_insulation_type', 'ceiling_structure_material',
-        'ceiling_surface_material', 'exterior_door_material', 'exterior_wall_condition', 'exterior_wall_insulation_type',
-        'exterior_wall_material_primary', 'exterior_wall_material_secondary', 'flooring_condition', 'flooring_material_primary',
-        'flooring_material_secondary', 'foundation_condition', 'foundation_material', 'foundation_type', 'foundation_waterproofing',
-        'gutters_condition', 'gutters_material', 'interior_door_material', 'interior_wall_condition', 'interior_wall_finish_primary',
-        'interior_wall_finish_secondary', 'interior_wall_structure_material', 'interior_wall_surface_material_primary',
-        'interior_wall_surface_material_secondary', 'primary_framing_material', 'roof_condition', 'roof_covering_material',
-        'roof_design_type', 'roof_material_type', 'roof_structure_material', 'roof_underlayment_type', 'secondary_framing_material',
-        'structural_damage_indicators', 'subfloor_material', 'window_frame_material', 'window_glazing_type', 'window_operation_type',
-        'window_screen_material'
-    ]
-    for k in structure:
-        if k in ['roof_age_years', 'ceiling_height_average', 'request_identifier', 'source_http_request']:
-            continue
-        if structure[k] is None:
-            if k in enum_fields:
-                structure[k] = None
-            else:
-                structure[k] = ''
+    # Only extract if explicitly present in input (not inferred from use code)
+    structure['architectural_style_type'] = None
+    structure['attachment_type'] = None
     # Exterior wall
     ext_wall = soup.find(string=re.compile(r'Exterior Wall 1'))
     if ext_wall:
         val = ext_wall.find_parent('tr').find_all('td')[-1].get_text(strip=True)
-        val_upper = val.upper()
-        if 'CB' in val_upper or 'CONCRETE BLOCK' in val_upper:
+        # Use exact text if matches enum, else null
+        if 'CB' in val.upper() or 'CONCRETE BLOCK' in val.upper():
             structure['exterior_wall_material_primary'] = 'Concrete Block'
-        elif 'STUCCO' in val_upper:
+        elif 'STUCCO' in val.upper():
             structure['exterior_wall_material_primary'] = 'Stucco'
         else:
             structure['exterior_wall_material_primary'] = None
@@ -136,12 +86,7 @@ def extract_structure_from_html(html, file_id):
     ext_wall2 = soup.find(string=re.compile(r'Exterior Wall 2'))
     if ext_wall2:
         val = ext_wall2.find_parent('tr').find_all('td')[-1].get_text(strip=True)
-        val_upper = val.upper()
-        if 'STUCCO' in val_upper:
-            structure['exterior_wall_material_secondary'] = 'Stucco Accent'
-        elif 'NONE' in val_upper:
-            structure['exterior_wall_material_secondary'] = None
-        elif 'WSF' in val_upper:
+        if 'STUCCO' in val.upper():
             structure['exterior_wall_material_secondary'] = 'Stucco Accent'
         else:
             structure['exterior_wall_material_secondary'] = None
@@ -158,10 +103,9 @@ def extract_structure_from_html(html, file_id):
     roof_cover = soup.find(string=re.compile(r'Roof Cover'))
     if roof_cover:
         val = roof_cover.find_parent('tr').find_all('td')[-1].get_text(strip=True)
-        val_upper = val.upper()
-        if 'CONCRETE TILE' in val_upper:
+        if 'CONCRETE TILE' in val.upper():
             structure['roof_covering_material'] = 'Concrete Tile'
-        elif 'MIN. ROOFING' in val_upper or 'CORR/SH.M' in val_upper or 'METAL' in val_upper:
+        elif 'MIN. ROOFING' in val.upper() or 'CORR/SH.M' in val.upper():
             structure['roof_covering_material'] = 'Metal Corrugated'
         else:
             structure['roof_covering_material'] = None
@@ -192,9 +136,7 @@ def extract_structure_from_html(html, file_id):
             structure['flooring_material_secondary'] = 'Carpet'
         else:
             structure['flooring_material_secondary'] = None
-    # Framing
-    structure['primary_framing_material'] = None  # Only set if explicitly present in input
-    # Add more extraction as needed
+    # All other fields remain None unless explicitly present in input
     return structure
 
 def main():

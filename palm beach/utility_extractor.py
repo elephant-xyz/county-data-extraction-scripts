@@ -51,9 +51,10 @@ def extract_utility_from_html(html, file_id):
     # Electrical
     # Not directly available, so leave as None
     # Utilities
-    utility['public_utility_type'] = 'WaterAvailable'
-    utility['sewer_type'] = 'Public'
-    utility['water_source_type'] = 'Public'
+    # Only extract if explicitly present in input
+    utility['public_utility_type'] = None
+    utility['sewer_type'] = None
+    utility['water_source_type'] = None
     return utility
 
 def main():

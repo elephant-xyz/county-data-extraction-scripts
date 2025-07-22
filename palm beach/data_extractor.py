@@ -184,6 +184,17 @@ def extract_tax(soup, parcel_id, property_dir):
                 'land': parse_currency(land[i]) if i < len(land) else 0,
                 'market': parse_currency(market[i]) if i < len(market) else 0
             }
+    # Collect all years from both appraisals and assessed tables
+    all_years = set(appraisals.keys())
+    for h2 in h2s:
+        table = h2.find_next('table')
+        if not table:
+            continue
+        header = table.find('thead').find_all('th')
+        years = [th.text.strip() for th in header[1:]]
+        all_years.update(years)
+    all_years = sorted(all_years, reverse=True)
+    # Now for each year, extract from the correct row/column
     for h2 in h2s:
         table = h2.find_next('table')
         if not table:
@@ -379,21 +390,36 @@ def extract_structure_utility_layout(parcel_id, property_dir):
                                 pass
     # Compose layouts
     ldata = []
+    def make_layout(space_type):
+        l = layout_data.get(addr_key, {}).get('layouts', [])[0] if layout_data.get(addr_key, {}).get('layouts', []) else {}
+        l = dict(l) if l else {}
+        l['space_type'] = space_type
+        # Fill all required fields from schema with null/defaults if missing
+        required_fields = [
+            'source_http_request', 'request_identifier', 'space_type', 'flooring_material_type', 'size_square_feet', 'floor_level', 'has_windows', 'window_design_type', 'window_material_type', 'window_treatment_type', 'is_finished', 'furnished', 'paint_condition', 'flooring_wear', 'clutter_level', 'visible_damage', 'countertop_material', 'cabinet_style', 'fixture_finish_quality', 'design_style', 'natural_light_quality', 'decor_elements', 'pool_type', 'pool_equipment', 'spa_type', 'safety_features', 'view_type', 'lighting_features', 'condition_issues', 'is_exterior', 'pool_condition', 'pool_surface_type', 'pool_water_quality'
+        ]
+        # Set is_finished to False if not present (must be boolean)
+        for field in required_fields:
+            if field not in l or (field in l and l[field] is None):
+                if field == 'is_finished':
+                    l[field] = False
+                elif field == 'is_exterior':
+                    l[field] = False
+                elif field == 'has_windows':
+                    l[field] = False
+                elif field == 'source_http_request':
+                    l[field] = {'method': 'GET', 'url': f'https://pbcpao.gov/Property/Details?parcelID={parcel_id}'}
+                elif field == 'request_identifier':
+                    l[field] = parcel_id
+                else:
+                    l[field] = None
+        return l
     for _ in range(bedrooms):
-        l = layout_data.get(addr_key, {}).get('layouts', [])[0] if layout_data.get(addr_key, {}).get('layouts', []) else {}
-        l = dict(l) if l else {}
-        l['space_type'] = 'Bedroom'
-        ldata.append(l)
+        ldata.append(make_layout('Bedroom'))
     for _ in range(full_baths):
-        l = layout_data.get(addr_key, {}).get('layouts', [])[0] if layout_data.get(addr_key, {}).get('layouts', []) else {}
-        l = dict(l) if l else {}
-        l['space_type'] = 'Full Bathroom'
-        ldata.append(l)
+        ldata.append(make_layout('Full Bathroom'))
     for _ in range(half_baths):
-        l = layout_data.get(addr_key, {}).get('layouts', [])[0] if layout_data.get(addr_key, {}).get('layouts', []) else {}
-        l = dict(l) if l else {}
-        l['space_type'] = 'Half Bathroom / Powder Room'
-        ldata.append(l)
+        ldata.append(make_layout('Half Bathroom / Powder Room'))
     for i, layout in enumerate(ldata):
         with open(os.path.join(property_dir, f'layout_{i+1}.json'), 'w', encoding='utf-8') as f:
             json.dump(layout, f, indent=2)
