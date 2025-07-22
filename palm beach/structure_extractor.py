@@ -24,7 +24,6 @@ def extract_structure_from_html(html, file_id):
         },
         'architectural_style_type': None,  # Only if explicitly present in input
         'attachment_type': None,  # Only if explicitly present in input
-        'number_of_stories': None,
         'exterior_wall_material_primary': None,
         'exterior_wall_material_secondary': None,
         'exterior_wall_condition': None,
@@ -78,6 +77,8 @@ def extract_structure_from_html(html, file_id):
         # Use exact text if matches enum, else null
         if 'CB' in val.upper() or 'CONCRETE BLOCK' in val.upper():
             structure['exterior_wall_material_primary'] = 'Concrete Block'
+            if 'STUCCO' in val.upper():
+                structure['exterior_wall_material_secondary'] = 'Stucco Accent'
         elif 'STUCCO' in val.upper():
             structure['exterior_wall_material_primary'] = 'Stucco'
         else:
