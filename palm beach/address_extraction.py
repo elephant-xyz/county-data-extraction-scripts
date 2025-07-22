@@ -109,7 +109,35 @@ def main():
         if not match:
             print(f'No match found for {parcel_id}')
             continue  # skip if no match
-        # Build address object
+        # Build address object (fix: use candidate for street fields, clean up street_name)
+        # Extract directional and suffix from candidate street
+        street_parts = cand['street'].split()
+        pre_dir = None
+        post_dir = None
+        suffix = None
+        street_name_parts = []
+        # Directional abbreviations
+        dirs = {'N', 'S', 'E', 'W', 'NE', 'NW', 'SE', 'SW'}
+        suffixes = {'RDS','BLVD','LK','PIKE','KY','VW','CURV','PSGE','LDG','MT','UN','MDW','VIA','COR','KYS','VL','PR','CV','ISLE','LGT','HBR','BTM','HL','MEWS','HLS','PNES','LGTS','STRM','HWY','TRWY','SKWY','IS','EST','VWS','AVE','EXTS','CVS','ROW','RTE','FALL','GTWY','WLS','CLB','FRK','CPE','FWY','KNLS','RDG','JCT','RST','SPGS','CIR','CRST','EXPY','SMT','TRFY','CORS','LAND','UNS','JCTS','WAYS','TRL','WAY','TRLR','ALY','SPG','PKWY','CMN','DR','GRNS','OVAL','CIRS','PT','SHLS','VLY','HTS','CLF','FLT','MALL','FRDS','CYN','LNDG','MDWS','RD','XRDS','TER','PRT','RADL','GRVS','RDGS','INLT','TRAK','BYU','VLGS','CTR','ML','CTS','ARC','BND','RIV','FLDS','MTWY','MSN','SHRS','RUE','CRSE','CRES','ANX','DRS','STS','HOLW','VLG','PRTS','STA','FLD','XRD','WALL','TPKE','FT','BG','KNL','PLZ','ST','CSWY','BGS','RNCH','FRKS','LN','MTN','CTRS','ORCH','ISS','BRKS','BR','FLS','TRCE','PARK','GDNS','RPDS','SHL','LF','RPD','LCKS','GLN','PL','PATH','VIS','LKS','RUN','FRG','BRG','SQS','XING','PLN','GLNS','BLFS','PLNS','DL','CLFS','EXT','PASS','GDN','BRK','GRN','MNR','CP','PNE','SPUR','OPAS','UPAS','TUNL','SQ','LCK','ESTS','SHR','DM','MLS','WL','MNRS','STRA','FRGS','FRST','FLTS','CT','MTNS','FRD','NCK','RAMP','VLYS','PTS','BCH','LOOP','BYP','CMNS','FRY','WALK','HBRS','DV','HVN','BLF','GRV','CRK'}
+        # Pre-directional
+        if street_parts and street_parts[0].upper() in dirs:
+            pre_dir = street_parts[0].upper()
+            street_parts = street_parts[1:]
+        # Post-directional
+        if street_parts and street_parts[-1].upper() in dirs:
+            post_dir = street_parts[-1].upper()
+            street_parts = street_parts[:-1]
+        # Suffix
+        if street_parts and street_parts[-1].replace('.','').upper() in suffixes:
+            suffix = street_parts[-1].replace('.','').capitalize()
+            street_parts = street_parts[:-1]
+        # The rest is street name
+        street_name = ' '.join(street_parts).upper()
+        # Remove any unit or city name from street_name
+        if cand['unit'] and street_name.endswith(cand['unit'].upper()):
+            street_name = street_name[:-(len(cand['unit'])+1)].strip()
+        if cand['city'] and street_name.endswith(cand['city'].upper()):
+            street_name = street_name[:-(len(cand['city'])+1)].strip()
         address_obj = {
             'source_http_request': {
                 'method': seed[parcel_id]['method'],
@@ -125,12 +153,12 @@ def main():
             'plus_four_postal_code': None,  # Not available
             'postal_code': cand['postcode'],
             'state_code': 'FL',  # Assume FL for now
-            'street_name': parsed['street'].upper(),
-            'street_post_directional_text': parsed['post_dir'],
-            'street_pre_directional_text': parsed['pre_dir'],
-            'street_number': parsed['number'],
-            'street_suffix_type': (parsed['suffix'].capitalize() if parsed['suffix'] and parsed['suffix'].upper() in ['PKWY', 'BLVD', 'AVE', 'RD', 'ST', 'LN', 'DR', 'CT', 'PL', 'HWY', 'WAY', 'CIR', 'TRL', 'TER', 'PLZ'] else parsed['suffix']) if parsed['suffix'] else None,
-            'unit_identifier': parsed['unit'],
+            'street_name': street_name,
+            'street_post_directional_text': post_dir,
+            'street_pre_directional_text': pre_dir,
+            'street_number': cand['number'],
+            'street_suffix_type': suffix,
+            'unit_identifier': cand['unit'] if cand['unit'] else None,
             'township': None,
             'range': None,
             'section': None,
