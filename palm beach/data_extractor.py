@@ -100,17 +100,98 @@ for input_file in input_files:
         property_json["property_legal_description_text"] = clean_str(legal.text)
     if addr_key in structure_data and structure_data[addr_key].get("year_built"):
         property_json["property_structure_built_year"] = structure_data[addr_key]["year_built"]
+    # Extract number_of_units_type and lot_area_sqft from structural details
+    number_of_units = None
+    lot_area_sqft = None
+    struct_tables = soup.find_all("table", class_="structural_elements")
+    for struct_table in struct_tables:
+        rows = struct_table.find_all("tr")
+        for row in rows:
+            tds = row.find_all("td")
+            if len(tds) == 2:
+                label = tds[0].text.strip().lower()
+                val = tds[1].text.strip()
+                if ("number of units" in label or "units" in label) and val.isdigit():
+                    number_of_units = int(val)
+                if ("total square feet" in label or "area" == label) and val.isdigit():
+                    lot_area_sqft = int(val)
+    # Set number_of_units_type
+    if number_of_units == 1:
+        property_json["number_of_units_type"] = "One"
+    elif number_of_units == 2:
+        property_json["number_of_units_type"] = "Two"
+    elif number_of_units == 3:
+        property_json["number_of_units_type"] = "Three"
+    elif number_of_units == 4:
+        property_json["number_of_units_type"] = "Four"
+    elif number_of_units and 2 <= number_of_units <= 4:
+        property_json["number_of_units_type"] = "TwoToFour"
+    # Set lot_area_sqft as string for property (schema allows string or null)
+    if lot_area_sqft:
+        property_json["livable_floor_area"] = str(lot_area_sqft)
+    # Set property_type
+    property_type_set = False
+    # Try to extract from Subdivision
     subdiv = soup.find(id="MainContent_lblSubdiv")
     if subdiv:
         val = subdiv.text.strip().lower()
         if "condo" in val:
             property_json["property_type"] = "Condominium"
+            property_type_set = True
         elif "townhouse" in val:
             property_json["property_type"] = "Townhouse"
+            property_type_set = True
+        elif "single family" in val:
+            property_json["property_type"] = "SingleFamily"
+            property_type_set = True
+        elif "duplex" in val:
+            property_json["property_type"] = "Duplex"
+            property_type_set = True
+        elif "cooperative" in val:
+            property_json["property_type"] = "Cooperative"
+            property_type_set = True
+    # If not set, try to extract from Property Use Code
+    if not property_type_set:
+        # Find "Property Use Code" in structural_elements tables
+        for struct_table in soup.find_all("table", class_="structural_elements"):
+            rows = struct_table.find_all("tr")
+            for row in rows:
+                tds = row.find_all("td")
+                if len(tds) == 2:
+                    label = tds[0].text.strip().lower()
+                    val = tds[1].text.strip().lower()
+                    if "property use code" in label:
+                        # Map code or text to property_type
+                        if "condo" in val:
+                            property_json["property_type"] = "Condominium"
+                        elif "townhouse" in val:
+                            property_json["property_type"] = "Townhouse"
+                        elif "single family" in val:
+                            property_json["property_type"] = "SingleFamily"
+                        elif "duplex" in val:
+                            property_json["property_type"] = "Duplex"
+                        elif "cooperative" in val:
+                            property_json["property_type"] = "Cooperative"
+                        elif "0400" in val:
+                            property_json["property_type"] = "Condominium"
+                        elif "0100" in val:
+                            property_json["property_type"] = "SingleFamily"
+                        elif "0200" in val:
+                            property_json["property_type"] = "Duplex"
+                        elif "0300" in val:
+                            property_json["property_type"] = "Triplex"
+                        elif "0500" in val:
+                            property_json["property_type"] = "Townhouse"
+                        else:
+                            property_json["property_type"] = None
+                        property_type_set = True
+                        break
+            if property_type_set:
+                break
     with open(os.path.join(property_dir, "property.json"), "w") as f:
         json.dump(property_json, f, indent=2)
+
     # --- SALES ---
-    # Fix: Extract all sales rows, even if empty owner or price
     sales_tables = soup.find_all("h2", string=re.compile("Sales INFORMATION", re.I))
     sales_jsons = []
     sales_years = []
@@ -124,7 +205,6 @@ for input_file in input_files:
                     continue
                 date = parse_date(cols[0].text.strip())
                 price = clean_money(cols[1].text.strip())
-                # If price is 0, set to None
                 if price == 0:
                     price = None
                 sales_json = {
@@ -138,7 +218,6 @@ for input_file in input_files:
                 with open(os.path.join(property_dir, f"sales_{i+1}.json"), "w") as f:
                     json.dump(sales_json, f, indent=2)
     # --- TAXES ---
-    # Fix: Ensure all years in tables are output, even if some values are missing
     tax_years = set()
     assessed = {}
     taxable = {}
@@ -146,7 +225,6 @@ for input_file in input_files:
     building = {}
     land = {}
     monthly_tax = {}
-    # Assessed & taxable values
     for h2 in soup.find_all('h2', string=re.compile('Assessed & taxable values', re.I)):
         for tab in h2.find_all_next('div', class_='table_scroll'):
             ths = tab.find_all('th')
@@ -167,7 +245,6 @@ for input_file in input_files:
                             assessed[year] = val
                         elif 'taxable value' in label:
                             taxable[year] = val
-    # Appraisals
     for h2 in soup.find_all('h2', string=re.compile('Appraisals', re.I)):
         for tab in h2.find_all_next('div', class_='table_scroll'):
             ths = tab.find_all('th')
@@ -190,7 +267,6 @@ for input_file in input_files:
                             building[year] = val
                         elif 'land value' in label:
                             land[year] = val
-    # Taxes (monthly tax)
     for h2 in soup.find_all('h2', string=re.compile('Taxes', re.I)):
         for tab in h2.find_all_next('div', class_='table_scroll'):
             ths = tab.find_all('th')
@@ -208,7 +284,6 @@ for input_file in input_files:
                             if val == 0:
                                 val = None
                             monthly_tax[year] = val
-    # Write tax files for all years found in any table
     for year in sorted(tax_years):
         try:
             yint = int(year)
@@ -310,9 +385,6 @@ for input_file in input_files:
         with open(os.path.join(property_dir, "utility.json"), "w") as f:
             json.dump(util, f, indent=2)
     # --- LAYOUT ---
-    # Fix: Only output correct number of layouts (bedrooms, full baths, half baths)
-    # Remove any extra layout files
-    # Try to extract from structural details table (more reliable)
     bedroom_count = 0
     bathroom_count = 0
     half_bath_count = 0
@@ -330,7 +402,6 @@ for input_file in input_files:
                     bathroom_count = int(val)
                 if ("half bath" in label or ("half" in label and "bath" in label)) and val.isdigit():
                     half_bath_count = int(val)
-    # Remove any existing layout_*.json files before writing new ones
     for f in os.listdir(property_dir):
         if f.startswith("layout_") and f.endswith(".json"):
             os.remove(os.path.join(property_dir, f))
@@ -454,17 +525,25 @@ for input_file in input_files:
         layout_idx += 1
     # --- LOT ---
     lot_json = None
-    lot_section = soup.find("h3", string=re.compile("Property Land Details", re.I))
-    if lot_section:
-        lot_table = lot_section.find_next("table", class_="structural_elements")
-        if lot_table:
-            pass
     lot_schema_fields = [
         "source_http_request", "request_identifier", "lot_type", "lot_length_feet", "lot_width_feet", "lot_area_sqft", "landscaping_features", "view", "fencing_type", "fence_height", "fence_length", "driveway_material", "driveway_condition", "lot_condition_issues"
     ]
     lot_json = {k: None for k in lot_schema_fields}
     lot_json["source_http_request"] = address.get("source_http_request", {})
     lot_json["request_identifier"] = parcel_id
+    # Extract lot_area_sqft from structural details
+    lot_area_sqft = None
+    for struct_table in struct_tables:
+        rows = struct_table.find_all("tr")
+        for row in rows:
+            tds = row.find_all("td")
+            if len(tds) == 2:
+                label = tds[0].text.strip().lower()
+                val = tds[1].text.strip()
+                if ("total square feet" in label or "area" == label) and val.isdigit():
+                    lot_area_sqft = int(val)
+    if lot_area_sqft:
+        lot_json["lot_area_sqft"] = lot_area_sqft
     with open(os.path.join(property_dir, "lot.json"), "w") as f:
         json.dump(lot_json, f, indent=2)
     # --- REMOVE NULL/EMPTY FILES ---
