@@ -126,9 +126,7 @@ for input_file in input_files:
         property_json["number_of_units_type"] = "Four"
     elif number_of_units and 2 <= number_of_units <= 4:
         property_json["number_of_units_type"] = "TwoToFour"
-    # Set lot_area_sqft as string for property (schema allows string or null)
-    if lot_area_sqft:
-        property_json["livable_floor_area"] = str(lot_area_sqft)
+
     # Set property_type
     property_type_set = False
     # Try to extract from Subdivision
