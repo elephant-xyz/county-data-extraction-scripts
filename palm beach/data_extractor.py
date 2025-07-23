@@ -124,6 +124,9 @@ for input_file in input_files:
                     continue
                 date = parse_date(cols[0].text.strip())
                 price = clean_money(cols[1].text.strip())
+                # If price is 0, set to None
+                if price == 0:
+                    price = None
                 sales_json = {
                     "source_http_request": address.get("source_http_request", {}),
                     "request_identifier": f"{parcel_id}_sale_{i+1}",
@@ -145,7 +148,7 @@ for input_file in input_files:
     monthly_tax = {}
     # Assessed & taxable values
     for h2 in soup.find_all('h2', string=re.compile('Assessed & taxable values', re.I)):
-        for tab in h2.find_all_next('div', class_='table_scroll', limit=2):
+        for tab in h2.find_all_next('div', class_='table_scroll'):
             ths = tab.find_all('th')
             if len(ths) > 1:
                 years = [th.text.strip() for th in ths[1:]]
@@ -158,13 +161,15 @@ for input_file in input_files:
                     for j, year in enumerate(years):
                         tax_years.add(year)
                         val = clean_money(tds[j+1].text) if j+1 < len(tds) else None
+                        if val == 0:
+                            val = None
                         if 'assessed value' in label:
                             assessed[year] = val
                         elif 'taxable value' in label:
                             taxable[year] = val
     # Appraisals
     for h2 in soup.find_all('h2', string=re.compile('Appraisals', re.I)):
-        for tab in h2.find_all_next('div', class_='table_scroll', limit=2):
+        for tab in h2.find_all_next('div', class_='table_scroll'):
             ths = tab.find_all('th')
             if len(ths) > 1:
                 years = [th.text.strip() for th in ths[1:]]
@@ -177,18 +182,17 @@ for input_file in input_files:
                     for j, year in enumerate(years):
                         tax_years.add(year)
                         val = clean_money(tds[j+1].text) if j+1 < len(tds) else None
+                        if val == 0:
+                            val = None
                         if 'total market value' in label:
                             market[year] = val
                         elif 'improvement value' in label:
                             building[year] = val
                         elif 'land value' in label:
-                            if val is not None and val > 0:
-                                land[year] = round(val, 2)
-                            else:
-                                land[year] = None
+                            land[year] = val
     # Taxes (monthly tax)
     for h2 in soup.find_all('h2', string=re.compile('Taxes', re.I)):
-        for tab in h2.find_all_next('div', class_='table_scroll', limit=2):
+        for tab in h2.find_all_next('div', class_='table_scroll'):
             ths = tab.find_all('th')
             if len(ths) > 1:
                 years = [th.text.strip() for th in ths[1:]]
@@ -200,7 +204,10 @@ for input_file in input_files:
                     label = tds[0].text.strip().lower()
                     for j, year in enumerate(years):
                         if 'total tax' in label:
-                            monthly_tax[year] = clean_money(tds[j+1].text) if j+1 < len(tds) else None
+                            val = clean_money(tds[j+1].text) if j+1 < len(tds) else None
+                            if val == 0:
+                                val = None
+                            monthly_tax[year] = val
     # Write tax files for all years found in any table
     for year in sorted(tax_years):
         try:
