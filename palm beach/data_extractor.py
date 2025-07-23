@@ -126,7 +126,9 @@ for input_file in input_files:
         property_json["number_of_units_type"] = "Four"
     elif number_of_units and 2 <= number_of_units <= 4:
         property_json["number_of_units_type"] = "TwoToFour"
-
+    # Set lot_area_sqft as string for property (schema allows string or null)
+    if lot_area_sqft:
+        property_json["livable_floor_area"] = str(lot_area_sqft)
     # Set property_type
     property_type_set = False
     # Try to extract from Subdivision
@@ -529,19 +531,7 @@ for input_file in input_files:
     lot_json = {k: None for k in lot_schema_fields}
     lot_json["source_http_request"] = address.get("source_http_request", {})
     lot_json["request_identifier"] = parcel_id
-    # Extract lot_area_sqft from structural details
-    lot_area_sqft = None
-    for struct_table in struct_tables:
-        rows = struct_table.find_all("tr")
-        for row in rows:
-            tds = row.find_all("td")
-            if len(tds) == 2:
-                label = tds[0].text.strip().lower()
-                val = tds[1].text.strip()
-                if ("total square feet" in label or "area" == label) and val.isdigit():
-                    lot_area_sqft = int(val)
-    if lot_area_sqft:
-        lot_json["lot_area_sqft"] = lot_area_sqft
+
     with open(os.path.join(property_dir, "lot.json"), "w") as f:
         json.dump(lot_json, f, indent=2)
     # --- REMOVE NULL/EMPTY FILES ---
