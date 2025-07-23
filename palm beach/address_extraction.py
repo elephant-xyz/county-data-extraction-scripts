@@ -86,7 +86,13 @@ def main():
             print(f'Warning: possible_addresses file missing for {parcel_id}')
             continue
         with open(pa_path, 'r') as f:
-            candidates = json.load(f)
+            pa_data = json.load(f)
+        # Support both formats: dict (already mapped) or list (raw candidates)
+        if isinstance(pa_data, dict) and f'property_{parcel_id}' in pa_data:
+            # Already mapped, just copy
+            result[f'property_{parcel_id}'] = pa_data[f'property_{parcel_id}']
+            continue
+        candidates = pa_data if isinstance(pa_data, list) else []
         # Try exact match first
         match = None
         for cand in candidates:
@@ -118,7 +124,7 @@ def main():
         street_name_parts = []
         # Directional abbreviations
         dirs = {'N', 'S', 'E', 'W', 'NE', 'NW', 'SE', 'SW'}
-        suffixes = {'RDS','BLVD','LK','PIKE','KY','VW','CURV','PSGE','LDG','MT','UN','MDW','VIA','COR','KYS','VL','PR','CV','ISLE','LGT','HBR','BTM','HL','MEWS','HLS','PNES','LGTS','STRM','HWY','TRWY','SKWY','IS','EST','VWS','AVE','EXTS','CVS','ROW','RTE','FALL','GTWY','WLS','CLB','FRK','CPE','FWY','KNLS','RDG','JCT','RST','SPGS','CIR','CRST','EXPY','SMT','TRFY','CORS','LAND','UNS','JCTS','WAYS','TRL','WAY','TRLR','ALY','SPG','PKWY','CMN','DR','GRNS','OVAL','CIRS','PT','SHLS','VLY','HTS','CLF','FLT','MALL','FRDS','CYN','LNDG','MDWS','RD','XRDS','TER','PRT','RADL','GRVS','RDGS','INLT','TRAK','BYU','VLGS','CTR','ML','CTS','ARC','BND','RIV','FLDS','MTWY','MSN','SHRS','RUE','CRSE','CRES','ANX','DRS','STS','HOLW','VLG','PRTS','STA','FLD','XRD','WALL','TPKE','FT','BG','KNL','PLZ','ST','CSWY','BGS','RNCH','FRKS','LN','MTN','CTRS','ORCH','ISS','BRKS','BR','FLS','TRCE','PARK','GDNS','RPDS','SHL','LF','RPD','LCKS','GLN','PL','PATH','VIS','LKS','RUN','FRG','BRG','SQS','XING','PLN','GLNS','BLFS','PLNS','DL','CLFS','EXT','PASS','GDN','BRK','GRN','MNR','CP','PNE','SPUR','OPAS','UPAS','TUNL','SQ','LCK','ESTS','SHR','DM','MLS','WL','MNRS','STRA','FRGS','FRST','FLTS','CT','MTNS','FRD','NCK','RAMP','VLYS','PTS','BCH','LOOP','BYP','CMNS','FRY','WALK','HBRS','DV','HVN','BLF','GRV','CRK'}
+        suffixes = {'Rds','Blvd','Lk','Pike','Ky','Vw','Curv','Psge','Ldg','Mt','Un','Mdw','Via','Cor','Kys','Vl','Pr','Cv','Isle','Lgt','Hbr','Btm','Hl','Mews','Hls','Pnes','Lgts','Strm','Hwy','Trwy','Skwy','Is','Est','Vws','Ave','Exts','Cvs','Row','Rte','Fall','Gtwy','Wls','Clb','Frk','Cpe','Fwy','Knls','Rdg','Jct','Rst','Spgs','Cir','Crst','Expy','Smt','Trfy','Cors','Land','Uns','Jcts','Ways','Trl','Way','Trlr','Aly','Spg','Pkwy','Cmn','Dr','Grns','Oval','Cirs','Pt','Shls','Vly','Hts','Clf','Flt','Mall','Frds','Cyn','Lndg','Mdws','Rd','Xrds','Ter','Prt','Radl','Grvs','Rdgs','Inlt','Trak','Byu','Vlgs','Ctr','Ml','Cts','Arc','Bnd','Riv','Flds','Mtwy','Msn','Shrs','Rue','Crse','Cres','Anx','Drs','Sts','Holw','Vlg','Prts','Sta','Fld','Xrd','Wall','Tpke','Ft','Bg','Knl','Plz','St','Cswy','Bgs','Rnch','Frks','Ln','Mtn','Ctrs','Orch','Iss','Brks','Br','Fls','Trce','Park','Gdns','Rpds','Shl','Lf','Rpd','Lcks','Gln','Pl','Path','Vis','Lks','Run','Frg','Brg','Sqs','Xing','Pln','Glns','Blfs','Plns','Dl','Clfs','Ext','Pass','Gdn','Brk','Grn','Mnr','Cp','Pne','Spur','Opas','Upas','Tunl','Sq','Lck','Ests','Shr','Dm','Mls','Wl','Mnrs','Stra','Frgs','Frst','Flts','Ct','Mtns','Frd','Nck','Ramp','Vlys','Pts','Bch','Loop','Byp','Cmns','Fry','Walk','Hbrs','Dv','Hvn','Blf','Grv','Crk'}
         # Pre-directional
         if street_parts and street_parts[0].upper() in dirs:
             pre_dir = street_parts[0].upper()
@@ -128,7 +134,7 @@ def main():
             post_dir = street_parts[-1].upper()
             street_parts = street_parts[:-1]
         # Suffix
-        if street_parts and street_parts[-1].replace('.','').upper() in suffixes:
+        if street_parts and street_parts[-1].replace('.','').capitalize() in suffixes:
             suffix = street_parts[-1].replace('.','').capitalize()
             street_parts = street_parts[:-1]
         # The rest is street name
