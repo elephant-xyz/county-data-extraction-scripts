@@ -110,6 +110,7 @@ for input_file in input_files:
     with open(os.path.join(property_dir, "property.json"), "w") as f:
         json.dump(property_json, f, indent=2)
     # --- SALES ---
+    # Fix: Extract all sales rows, even if empty owner or price
     sales_tables = soup.find_all("h2", string=re.compile("Sales INFORMATION", re.I))
     sales_jsons = []
     sales_years = []
@@ -134,7 +135,7 @@ for input_file in input_files:
                 with open(os.path.join(property_dir, f"sales_{i+1}.json"), "w") as f:
                     json.dump(sales_json, f, indent=2)
     # --- TAXES ---
-    # Find 10-year tables for both 'Assessed & taxable values' and 'Appraisals'
+    # Fix: Ensure all years in tables are output, even if some values are missing
     tax_years = set()
     assessed = {}
     taxable = {}
@@ -156,7 +157,7 @@ for input_file in input_files:
                     label = tds[0].text.strip().lower()
                     for j, year in enumerate(years):
                         tax_years.add(year)
-                        val = clean_money(tds[j+1].text)
+                        val = clean_money(tds[j+1].text) if j+1 < len(tds) else None
                         if 'assessed value' in label:
                             assessed[year] = val
                         elif 'taxable value' in label:
@@ -175,14 +176,12 @@ for input_file in input_files:
                     label = tds[0].text.strip().lower()
                     for j, year in enumerate(years):
                         tax_years.add(year)
-                        val = clean_money(tds[j+1].text)
+                        val = clean_money(tds[j+1].text) if j+1 < len(tds) else None
                         if 'total market value' in label:
                             market[year] = val
                         elif 'improvement value' in label:
                             building[year] = val
                         elif 'land value' in label:
-                            # property_land_amount can be 0 if input is 0
-                            # property_land_amount must be null if input is 0
                             if val is not None and val > 0:
                                 land[year] = round(val, 2)
                             else:
@@ -201,8 +200,8 @@ for input_file in input_files:
                     label = tds[0].text.strip().lower()
                     for j, year in enumerate(years):
                         if 'total tax' in label:
-                            monthly_tax[year] = clean_money(tds[j+1].text)
-    # Write tax files
+                            monthly_tax[year] = clean_money(tds[j+1].text) if j+1 < len(tds) else None
+    # Write tax files for all years found in any table
     for year in sorted(tax_years):
         try:
             yint = int(year)
@@ -304,7 +303,8 @@ for input_file in input_files:
         with open(os.path.join(property_dir, "utility.json"), "w") as f:
             json.dump(util, f, indent=2)
     # --- LAYOUT ---
-    layout_files = []
+    # Fix: Only output correct number of layouts (bedrooms, full baths, half baths)
+    # Remove any extra layout files
     # Try to extract from structural details table (more reliable)
     bedroom_count = 0
     bathroom_count = 0
@@ -323,7 +323,10 @@ for input_file in input_files:
                     bathroom_count = int(val)
                 if ("half bath" in label or ("half" in label and "bath" in label)) and val.isdigit():
                     half_bath_count = int(val)
-    # Only write the correct number of layouts (no extras)
+    # Remove any existing layout_*.json files before writing new ones
+    for f in os.listdir(property_dir):
+        if f.startswith("layout_") and f.endswith(".json"):
+            os.remove(os.path.join(property_dir, f))
     layout_idx = 1
     for i in range(bedroom_count):
         layout = {
