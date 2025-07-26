@@ -10,7 +10,7 @@ OUTPUT_SCHEMA = 'owners/owners_schema.json'
 COMPANY_KEYWORDS = [
     'INC', 'LLC', 'LTD', 'CORP', 'CO', 'FOUNDATION', 'ALLIANCE', 'RESCUE', 'MISSION',
     'SOLUTIONS', 'SERVICES', 'SYSTEMS', 'COUNCIL', 'VETERANS', 'FIRST RESPONDERS', 'HEROES',
-    'INITIATIVE', 'ASSOCIATION', 'GROUP', 'TRUST'
+    'INITIATIVE', 'ASSOCIATION', 'GROUP', 'TRUST', "TR", "tr"
 ]
 
 def is_company(name):
